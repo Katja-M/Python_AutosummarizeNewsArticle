@@ -33,6 +33,9 @@ from string import punctuation
 # The following built-in Python function will, when given a list, quickly and easily return the n largest elements in that list
 from heapq import nlargest
 
+# modules to download article from the internet
+import urllib.request
+from bs4 import BeautifulSoup
 ##################################################################################
 # First class: FrequencySummarizer
 # This class encapsulates the following behavior
@@ -50,11 +53,11 @@ class FrequencySummarizer:
     # Self is a keyword that is used to refer to the object being instantiated and its member variables
     # Whenever you want to differentiate a variable as a member variable, we use the keyword 'self'
     def __init__(self, min_cut = 0.1, max_cut = 0.9):
-        self._min_cult = min_cut
+        self._min_cut = min_cut
         self._max_cut = max_cut
         # The notation self._ means that these are member variables of this classs
         # We define as stopwords, words in english and punctuation.
-        self._stopwords = set(stopwords.words('english')) + list(punctuation)
+        self._stopwords = set(stopwords.words('english') + list(punctuation))
     
     # If you define a variable here, i.e. outside a member function but inside a class, that member variable becomes static.
     # The means that it belongs to the class and not to any individual instance (object) of the class
@@ -83,7 +86,7 @@ class FrequencySummarizer:
         # The variable max_freq will give us the highest frequency
         max_freq = float(max(freq.values()))
 
-        for word in freq.keys():
+        for word in list(freq.keys()):
             #Dividing each frequency by the highest frequency
             freq[word] = freq[word]/max_freq
 
@@ -104,12 +107,13 @@ class FrequencySummarizer:
         # Check whether the number of sentences used to summarize is not more than the number of sentences in the text itself
         assert n <= len(sents)
         # 'assert' is a way of making sure a condition holds true, else an exception is thrown. Used to carry out sanity checks
+        print('The value of n: ' + str(n))
         
         # The following part of the code takes every sentence in the list sents,
         # then it converts every sentence to lower case
         # and then it splits each sentence into words.
         # There is 1 list of words per sentence and these lists are mushed into one giant list.
-        word_sent = [word_tokenize(s.lower() for s in sents)]
+        word_sent = [word_tokenize(s.lower()) for s in sents]
 
         # By calling the method _compute_frequencies we get a dictionary with the frequency of all non-stop words back.
         self._freq = self._compute_frequencies(word_sent)
@@ -130,8 +134,60 @@ class FrequencySummarizer:
 
         # The variable sents_idx will be the list of sentences we want to use in our summary.
         # That means, the summary is formed by the most important sentences in our article
-        # The function nlargest takes in n as number of sentences that it should return, ranking which is the dictionary that it is going to sort
+        # The function nlargest takes in n as number of sentences that it should return, rankings which is the dictionary that it is going to sort
         # and the key as well on which it going to sort it.
-        sents_idx = nlargest(n, rankings, key = rankings.get())
+        sents_idx = nlargest(n, rankings, key = rankings.get)
 
-    return [sents[j] for j in sents_idx]
+        #returnstr = ''
+
+        #for j in sents_idx:
+            #countstr =  'This is sentence ' + str(j) +'. \n'
+            #textstr = sents[j]
+            #returnstr = returnstr + countstr + textstr + '\n'
+
+        return [sents[j] for j in sents_idx]
+        #return returnstr
+
+#############################################################
+# Now we get the URL
+#############################################################
+
+# The following function will take in the URL of an article we are interested in
+# and it will return the raw text from the article
+# This function is specific to the syntax of the washington Post
+def get_only_text_washintonpost_url(url):
+    page = urllib.request.urlopen(url).read().decode('utf8')
+    #initialize a BeautifulSoup object with the page we downloaded
+    soup = BeautifulSoup(page)
+    # The BeautifulSoup member function find_all() allows as to find all the text that is enclosed
+    # within the tag that is specified within find all
+    # soup.find_all() will return an object p
+    # Then we are using the lambda function to join all the text inside the <article> tags
+    #text = ''.join(map(lambda p: p.text, soup.find_all('article')))
+
+    # Solution from stackexchange
+    # retrieve all of the paragraph tags
+    text = soup.find('article').find("div", {'class': 'article-body'})
+
+    #soup2 = BeautifulSoup(text)
+    #print(soup2.prettify())
+    # The follow code finds all the text between the p tags and mush them all together
+    text = ''.join(map(lambda p: p.text, text.find_all('p')))
+    return soup.title.text, text
+
+# Let's try it
+someURL = 'https://www.washingtonpost.com/politics/reopening-us-economy-by-may-1-may-be-unrealistic-say-experts-including-some-within-trump-administration/2020/04/12/15c922e4-7cde-11ea-9040-68981f488eed_story.html'
+textOfSomeURL = get_only_text_washintonpost_url(someURL)
+
+#print(textOfSomeURL[1])
+
+# Instantiate an object of the frequency summarizer class by calling the constructor of this class
+fs = FrequencySummarizer()
+# Calling the member function summarize to get the summary of the article
+summary = fs.summarize(textOfSomeURL[1], 3)
+
+print('This is the summary')
+
+print(summary)
+
+# While we get a summary, it seems like some sentences were not tokenized. Hence, multiple sentences were interpreted as one long sentence
